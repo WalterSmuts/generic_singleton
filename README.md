@@ -40,8 +40,8 @@ fn main() {
 ### Current limitations:
 - Each thread has a different map. I may add `get_or_init_local` and `get_or_init_global` if I
 can figure out how to implement concurrent access and the required trait bound to make it safe.
-- There is only one map(per thread). Mutliple uses of `get_or_init` on the same type will
-return the __SAME__ singleton. Perhaps even accross crate boundaries. I might be able to limit
+- There is only one map(per thread). Multiple uses of `get_or_init` on the same type will
+return the __SAME__ singleton. Perhaps even across crate boundaries. I might be able to limit
 it by providing a macro that salts the key in `AnyMap` with a context about which function it's
 being called from.
 
