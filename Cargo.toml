@@ -1,0 +1,17 @@
+[package]
+name = "generic_singleton"
+version = "0.1.0"
+edition = "2021"
+authors = ["Walter Smuts <smuts.walter@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "A library crate providing an FFT API for arrays"
+documentation = "https://docs.rs/generic_singleton/"
+repository = "https://github.com/WalterSmuts/generic_singleton"
+keywords = ["static", "singleton", "generic", "initialize", "global"]
+categories = ["caching", "data-structures", "memory-management", "config", "rust-patterns"]
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anymap = "0.12.1"
