@@ -3,7 +3,7 @@
 #![doc = include_str!("../README.md")]
 
 use anymap::AnyMap;
-use std::cell::RefCell;
+use std::cell::UnsafeCell;
 
 /// Get a static reference to a generic singleton or initialize it if it doesn't exist.
 ///
@@ -11,24 +11,32 @@ use std::cell::RefCell;
 /// same type, the outer call will persist. If this example confuses you, don't worry, it's a
 /// contrived non-sensical example that resulted from testing the safety of this library.
 pub fn get_or_init<T: 'static>(init: fn() -> T) -> &'static T {
-    // TODO: Consider using UnsafeCell to avoid runtime borrow-checking. As it stands right now
-    //       it's probably not a good idea since the user will be able to trigger UB in the case
-    //       where currently the code would panic. If we can remove the panic we can most likely
-    //       safely switch to using UnsafeCell.
-    //
     thread_local! {
-        static REF_CELL_MAP: RefCell<AnyMap> = RefCell::new(AnyMap::new());
+        static REF_CELL_MAP: UnsafeCell<AnyMap> = UnsafeCell::new(AnyMap::new());
     };
     REF_CELL_MAP.with(|map_cell| {
         // Curly brackets are important here to drop the borrow after checking
-        let contains = { map_cell.borrow().contains::<T>() };
+        let contains = {
+            // SAFETY:
+            // This was tested using a RefCell in the following commit:
+            // d23f9f28ed6b9d1b61cc82e9e2cff17c7f4575c1
+            let map = unsafe { map_cell.get().as_ref().unwrap() };
+            map.contains::<T>()
+        };
         if !contains {
             // Important to calculate this value BEFORE we borrow the map
             let val = init();
-            map_cell.borrow_mut().insert(val);
+            // SAFETY:
+            // This was tested using a RefCell in the following commit:
+            // d23f9f28ed6b9d1b61cc82e9e2cff17c7f4575c1
+            let map = unsafe { map_cell.get().as_mut().unwrap_unchecked() };
+            map.insert(val);
             // Drop the borrow
         }
-        let map = map_cell.borrow();
+        // SAFETY:
+        // This was tested using a RefCell in the following commit:
+        // d23f9f28ed6b9d1b61cc82e9e2cff17c7f4575c1
+        let map = unsafe { map_cell.get().as_ref().unwrap() };
         // SAFETY:
         // The function will only return None if the item is not present. Since we always add the
         // item if it's not present two lines above and never remove items, we can be sure that
