@@ -10,6 +10,30 @@ use std::cell::UnsafeCell;
 /// You can even call [get_or_init] inside the init function, although, if you're initializing the
 /// same type, the outer call will persist. If this example confuses you, don't worry, it's a
 /// contrived non-sensical example that resulted from testing the safety of this library.
+///
+/// ### Example
+/// ```rust
+/// use std::sync::Mutex;
+///
+/// fn generic_function<T: Copy + std::ops::Add<Output = T> + 'static>(initializer: fn() -> Mutex<T>) -> T {
+///     {
+///         let mut a = generic_singleton::get_or_init(initializer).lock().unwrap();
+///         let b = *a;
+///         *a = *a + b;
+///         *a
+///     }
+/// }
+///
+/// fn main() {
+///     assert_eq!(generic_function(||Mutex::new(2)), 4);
+///     assert_eq!(generic_function(||Mutex::new(2)), 8);
+///     assert_eq!(generic_function(||Mutex::new(2)), 16);
+///
+///     assert_eq!(generic_function(||Mutex::new(2.0)), 4.0);
+///     assert_eq!(generic_function(||Mutex::new(2.0)), 8.0);
+///     assert_eq!(generic_function(||Mutex::new(2.0)), 16.0);
+/// }
+/// ```
 pub fn get_or_init<T: 'static>(init: fn() -> T) -> &'static T {
     thread_local! {
         static UNSAFE_CELL_MAP: UnsafeCell<AnyMap> = UnsafeCell::new(AnyMap::new());
