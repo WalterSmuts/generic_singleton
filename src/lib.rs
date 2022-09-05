@@ -12,9 +12,9 @@ use std::cell::UnsafeCell;
 /// contrived non-sensical example that resulted from testing the safety of this library.
 pub fn get_or_init<T: 'static>(init: fn() -> T) -> &'static T {
     thread_local! {
-        static REF_CELL_MAP: UnsafeCell<AnyMap> = UnsafeCell::new(AnyMap::new());
+        static UNSAFE_CELL_MAP: UnsafeCell<AnyMap> = UnsafeCell::new(AnyMap::new());
     };
-    REF_CELL_MAP.with(|map_cell| {
+    UNSAFE_CELL_MAP.with(|map_cell| {
         // Curly brackets are important here to drop the borrow after checking
         let contains = {
             // SAFETY:
