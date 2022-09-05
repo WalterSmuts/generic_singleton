@@ -7,8 +7,9 @@ use std::cell::RefCell;
 
 /// Get a static reference to a generic singleton or initialize it if it doesn't exist.
 ///
-/// # Panics
-/// Initialization will panic if the init function calls get_or_init during initialization.
+/// You can even call [get_or_init] inside the init function, although, if you're initializing the
+/// same type, the outer call will persist. If this example confuses you, don't worry, it's a
+/// contrived non-sensical example that resulted from testing the safety of this library.
 pub fn get_or_init<T: 'static>(init: fn() -> T) -> &'static T {
     // TODO: Consider using UnsafeCell to avoid runtime borrow-checking. As it stands right now
     //       it's probably not a good idea since the user will be able to trigger UB in the case
@@ -19,10 +20,15 @@ pub fn get_or_init<T: 'static>(init: fn() -> T) -> &'static T {
         static REF_CELL_MAP: RefCell<AnyMap> = RefCell::new(AnyMap::new());
     };
     REF_CELL_MAP.with(|map_cell| {
-        let mut map = map_cell.borrow_mut();
-        if !map.contains::<T>() {
-            map.insert(init());
+        // Curly brackets are important here to drop the borrow after checking
+        let contains = { map_cell.borrow().contains::<T>() };
+        if !contains {
+            // Important to calculate this value BEFORE we borrow the map
+            let val = init();
+            map_cell.borrow_mut().insert(val);
+            // Drop the borrow
         }
+        let map = map_cell.borrow();
         // SAFETY:
         // The function will only return None if the item is not present. Since we always add the
         // item if it's not present two lines above and never remove items, we can be sure that
@@ -64,5 +70,10 @@ mod tests {
         let a = get_or_init(|| 0);
         let b = get_or_init(|| 1);
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn recursive_call_to_get_or_init_does_not_panic() {
+        get_or_init(|| get_or_init(|| 0));
     }
 }
