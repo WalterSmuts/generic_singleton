@@ -13,6 +13,12 @@ parameter. That's where this crate saves the day!
 time you call `get_or_init` we initialize the singleton in thread local storage. Subsequent
 calls to `get_or_init` will retrieve the singleton from the map.
 
+__DO NOT USE WITH A TYPE YOUR CRATE DOES NOT PRIVATELY OWN!!!__ The map is
+shared across crates, so if you use a type that is publicly available, then
+another crate will be able to mutate your singleton, breaking whichever rules
+you've got in place and vice-versa. Use the [new type pattern] if you need to
+use a public struct in the map.
+
 ### Example
 ```rust
 use std::sync::Mutex;
@@ -41,9 +47,10 @@ fn main() {
 - Each thread has a different map. I may add `get_or_init_local` and `get_or_init_global` if I
 can figure out how to implement concurrent access and the required trait bound to make it safe.
 - There is only one map(per thread). Multiple uses of `get_or_init` on the same type will
-return the __SAME__ singleton. Perhaps even across crate boundaries. I might be able to limit
+return the __SAME__ singleton. __Even across crate boundaries!__ I might be able to limit
 it by providing a macro that salts the key in `AnyMap` with a context about which function it's
 being called from.
 
 [static generic items]: https://doc.rust-lang.org/reference/items/static-items.html#statics--generics
 [anymap]: https://docs.rs/anymap/latest/anymap/
+[new type pattern]: https://doc.rust-lang.org/rust-by-example/generics/new_types.html
