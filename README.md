@@ -21,25 +21,62 @@ use a public struct in the map.
 
 ### Example
 ```rust
-use std::sync::Mutex;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut, Mul};
 
-fn generic_function<T: Copy + std::ops::Add<Output = T> + 'static>(initializer: fn() -> Mutex<T>) -> T {
-    {
-        let mut a = generic_singleton::get_or_init(initializer).lock().unwrap();
-        let b = *a;
-        *a = *a + b;
-        *a
+use generic_singleton::get_or_init;
+// The expensive function we're trying to cache using a singleton map
+fn multiply<T: Mul<Output = T>>(a: T, b: T) -> T {
+    a * b
+}
+
+// Private struct to use in the `get_or_init` function
+struct MyPrivateHashMap<T: Mul<Output = T>>(HashMap<(T, T), T>);
+
+impl<T: Mul<Output = T>> Deref for MyPrivateHashMap<T> {
+    type Target = HashMap<(T, T), T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: Mul<Output = T>> DerefMut for MyPrivateHashMap<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+fn multiply_with_cache<T: Mul<Output = T>>(a: T, b: T) -> T
+where
+    T: std::cmp::Eq,
+    T: Copy,
+    T: 'static,
+    (T, T): std::hash::Hash,
+{
+    // This is a generic singleton map!!!
+    let map = get_or_init(|| RefCell::new(MyPrivateHashMap(HashMap::new())));
+    let key = (a, b);
+    if map.borrow().contains_key(&key) {
+        *map.borrow().get(&key).unwrap()
+    } else {
+        let result = multiply(a, b);
+        map.borrow_mut().insert(key, result);
+        result
     }
 }
 
 fn main() {
-    assert_eq!(generic_function(||Mutex::new(2)), 4);
-    assert_eq!(generic_function(||Mutex::new(2)), 8);
-    assert_eq!(generic_function(||Mutex::new(2)), 16);
+    // This call will create the AnyMap and the MyPrivateHashMap<i32> and do the multiplication
+    multiply_with_cache::<u32>(10, 10);
+    // This call will only retrieve the value of the multiplication from MyPrivateHashMap<i32>
+    multiply_with_cache::<u32>(10, 10);
 
-    assert_eq!(generic_function(||Mutex::new(2.0)), 4.0);
-    assert_eq!(generic_function(||Mutex::new(2.0)), 8.0);
-    assert_eq!(generic_function(||Mutex::new(2.0)), 16.0);
+    // This call will create a second MyPrivateHashMap< and do the multiplication
+    multiply_with_cache::<i32>(-1, -10);
+    // This call will only retrieve the value of the multiplication from MyPrivateHashMap
+    multiply_with_cache::<i32>(-1, -10);
 }
 ```
 
