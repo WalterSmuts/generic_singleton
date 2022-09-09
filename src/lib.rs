@@ -34,7 +34,7 @@ use std::cell::UnsafeCell;
 ///     assert_eq!(generic_function(||Mutex::new(2.0)), 16.0);
 /// }
 /// ```
-pub fn get_or_init<T: 'static>(init: fn() -> T) -> &'static T {
+pub fn get_or_init<T: 'static>(init: impl FnOnce() -> T) -> &'static T {
     thread_local! {
         static UNSAFE_CELL_MAP: UnsafeCell<AnyMap> = UnsafeCell::new(AnyMap::new());
     };
