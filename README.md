@@ -20,26 +20,11 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut, Mul};
 
-// The expensive function we're trying to cache using a singleton map
+// The expensive function we're trying to cache using a singleton map, however,
+// we want the user of the function to determine the type of the elements being
+// multiplied.
 fn multiply<T: Mul<Output = T>>(a: T, b: T) -> T {
     a * b
-}
-
-// Private struct to use in the `get_or_init` macro
-struct MyPrivateHashMap<T: Mul<Output = T>>(HashMap<(T, T), T>);
-
-impl<T: Mul<Output = T>> Deref for MyPrivateHashMap<T> {
-    type Target = HashMap<(T, T), T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T: Mul<Output = T>> DerefMut for MyPrivateHashMap<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
 }
 
 fn multiply_with_cache<T: Mul<Output = T>>(a: T, b: T) -> T
@@ -50,7 +35,7 @@ where
     (T, T): std::hash::Hash,
 {
     // This is a generic singleton map!!!
-    let map = generic_singleton::get_or_init!(|| RefCell::new(MyPrivateHashMap(HashMap::new())));
+    let map = generic_singleton::get_or_init!(|| RefCell::new(HashMap::new()));
     let key = (a, b);
     if map.borrow().contains_key(&key) {
         *map.borrow().get(&key).unwrap()
@@ -62,14 +47,14 @@ where
 }
 
 fn main() {
-    // This call will create the AnyMap and the MyPrivateHashMap<i32> and do the multiplication
+    // This call will create the AnyMap and the HashMap<i32> and do the multiplication
     multiply_with_cache::<u32>(10, 10);
-    // This call will only retrieve the value of the multiplication from MyPrivateHashMap<i32>
+    // This call will only retrieve the value of the multiplication from HashMap<i32>
     multiply_with_cache::<u32>(10, 10);
 
-    // This call will create a second MyPrivateHashMap< and do the multiplication
+    // This call will create a second HashMap< and do the multiplication
     multiply_with_cache::<i32>(-1, -10);
-    // This call will only retrieve the value of the multiplication from MyPrivateHashMap
+    // This call will only retrieve the value of the multiplication from HashMap
     multiply_with_cache::<i32>(-1, -10);
 }
 ```
