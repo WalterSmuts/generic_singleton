@@ -6,10 +6,6 @@ use std::cell::UnsafeCell;
 
 /// Get a static reference to a generic singleton or initialize it if it doesn't exist.
 ///
-/// You can even call [get_or_init] inside the init function, although, if you're initializing the
-/// same type, the outer call will persist. If this example confuses you, don't worry, it's a
-/// contrived non-sensical example that resulted from testing the safety of this library.
-///
 /// ### Example
 /// ```rust
 /// use std::sync::Mutex;
