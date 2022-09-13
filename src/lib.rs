@@ -3,6 +3,7 @@
 #![doc = include_str!("../README.md")]
 use anymap::AnyMap;
 use std::cell::UnsafeCell;
+pub extern crate anymap;
 
 /// Get a static reference to a generic singleton or initialize it if it doesn't exist.
 ///
@@ -34,8 +35,8 @@ use std::cell::UnsafeCell;
 #[macro_export]
 macro_rules! get_or_init {
     ($init:expr) => {{
-        use anymap::AnyMap;
         use std::cell::UnsafeCell;
+        use $crate::anymap::AnyMap;
         use $crate::get_from_map;
 
         thread_local! {
