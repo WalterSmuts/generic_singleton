@@ -25,13 +25,12 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut, Mul};
 
-use generic_singleton::get_or_init;
 // The expensive function we're trying to cache using a singleton map
 fn multiply<T: Mul<Output = T>>(a: T, b: T) -> T {
     a * b
 }
 
-// Private struct to use in the `get_or_init` function
+// Private struct to use in the `get_or_init` macro
 struct MyPrivateHashMap<T: Mul<Output = T>>(HashMap<(T, T), T>);
 
 impl<T: Mul<Output = T>> Deref for MyPrivateHashMap<T> {
@@ -56,7 +55,7 @@ where
     (T, T): std::hash::Hash,
 {
     // This is a generic singleton map!!!
-    let map = get_or_init(|| RefCell::new(MyPrivateHashMap(HashMap::new())));
+    let map = generic_singleton::get_or_init!(|| RefCell::new(MyPrivateHashMap(HashMap::new())));
     let key = (a, b);
     if map.borrow().contains_key(&key) {
         *map.borrow().get(&key).unwrap()

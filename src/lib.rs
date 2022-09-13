@@ -1,7 +1,6 @@
 #![deny(missing_docs)]
 #![deny(clippy::undocumented_unsafe_blocks)]
 #![doc = include_str!("../README.md")]
-
 use anymap::AnyMap;
 use std::cell::UnsafeCell;
 
@@ -17,7 +16,7 @@ use std::cell::UnsafeCell;
 ///
 /// fn generic_function<T: Copy + std::ops::Add<Output = T> + 'static>(initializer: fn() -> Mutex<T>) -> T {
 ///     {
-///         let mut a = generic_singleton::get_or_init(initializer).lock().unwrap();
+///         let mut a = generic_singleton::get_or_init!(initializer).lock().unwrap();
 ///         let b = *a;
 ///         *a = *a + b;
 ///         *a
@@ -34,14 +33,23 @@ use std::cell::UnsafeCell;
 ///     assert_eq!(generic_function(||Mutex::new(2.0)), 16.0);
 /// }
 /// ```
-pub fn get_or_init<T: 'static>(init: impl FnOnce() -> T) -> &'static T {
-    thread_local! {
-        static UNSAFE_CELL_MAP: UnsafeCell<AnyMap> = UnsafeCell::new(AnyMap::new());
-    };
-    UNSAFE_CELL_MAP.with(|map_cell| factored(map_cell, init))
+#[macro_export]
+macro_rules! get_or_init {
+    ($init:expr) => {{
+        use anymap::AnyMap;
+        use std::cell::UnsafeCell;
+        use $crate::get_from_map;
+
+        thread_local! {
+            static UNSAFE_CELL_MAP: UnsafeCell<AnyMap> = UnsafeCell::new(AnyMap::new());
+        };
+        UNSAFE_CELL_MAP.with(|map_cell| get_from_map(map_cell, $init))
+    }};
 }
 
-fn factored<T>(map_cell: &UnsafeCell<AnyMap>, init: impl FnOnce() -> T) -> &'static T {
+/// Used by the [`get_or_init`] macro to access the generic item from the map. Do not use
+/// directly. Use the [`get_or_init`] macro instead.
+pub fn get_from_map<T>(map_cell: &UnsafeCell<AnyMap>, init: impl FnOnce() -> T) -> &'static T {
     // Curly brackets are important here to drop the borrow after checking
     let contains = {
         // SAFETY:
@@ -99,15 +107,19 @@ fn factored<T>(map_cell: &UnsafeCell<AnyMap>, init: impl FnOnce() -> T) -> &'sta
 mod tests {
     use super::*;
 
+    fn testing_function() -> &'static i32 {
+        get_or_init!(|| 0)
+    }
+
     #[test]
     fn works() {
-        let a = get_or_init(|| 0);
-        let b = get_or_init(|| 1);
-        assert_eq!(a, b);
+        let a = testing_function();
+        let b = testing_function();
+        assert!(std::ptr::eq(a, b));
     }
 
     #[test]
     fn recursive_call_to_get_or_init_does_not_panic() {
-        get_or_init(|| get_or_init(|| 0));
+        get_or_init!(|| get_or_init!(|| 0));
     }
 }
