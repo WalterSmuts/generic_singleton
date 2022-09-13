@@ -15,3 +15,6 @@ readme = "README.md"
 
 [dependencies]
 anymap = "1.0.0-beta.2"
+
+[dev-dependencies]
+num-traits = "0.2.15"

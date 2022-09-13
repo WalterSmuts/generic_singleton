@@ -16,46 +16,31 @@ retrieve the singleton from the map.
 
 ### Example
 ```rust
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::ops::{Deref, DerefMut, Mul};
+use std::{cell::RefCell, ops::AddAssign};
 
-// The expensive function we're trying to cache using a singleton map, however,
-// we want the user of the function to determine the type of the elements being
-// multiplied.
-fn multiply<T: Mul<Output = T>>(a: T, b: T) -> T {
-    a * b
-}
+use num_traits::{One, Zero};
 
-fn multiply_with_cache<T: Mul<Output = T>>(a: T, b: T) -> T
-where
-    T: std::cmp::Eq,
-    T: Copy,
-    T: 'static,
-    (T, T): std::hash::Hash,
-{
-    // This is a generic singleton map!!!
-    let map = generic_singleton::get_or_init!(|| RefCell::new(HashMap::new()));
-    let key = (a, b);
-    if map.borrow().contains_key(&key) {
-        *map.borrow().get(&key).unwrap()
-    } else {
-        let result = multiply(a, b);
-        map.borrow_mut().insert(key, result);
-        result
-    }
+fn generic_call_counter<T: Zero + One + Copy + AddAssign + 'static>() -> T {
+    let mut count = generic_singleton::get_or_init!(|| RefCell::new(T::zero())).borrow_mut();
+    *count += T::one();
+    *count
 }
 
 fn main() {
-    // This call will create the AnyMap and the HashMap<i32> and do the multiplication
-    multiply_with_cache::<u32>(10, 10);
-    // This call will only retrieve the value of the multiplication from HashMap<i32>
-    multiply_with_cache::<u32>(10, 10);
+    // Works with usize
+    assert_eq!(generic_call_counter::<usize>(), 1);
+    assert_eq!(generic_call_counter::<usize>(), 2);
+    assert_eq!(generic_call_counter::<usize>(), 3);
 
-    // This call will create a second HashMap< and do the multiplication
-    multiply_with_cache::<i32>(-1, -10);
-    // This call will only retrieve the value of the multiplication from HashMap
-    multiply_with_cache::<i32>(-1, -10);
+    // Works with i32
+    assert_eq!(generic_call_counter::<i32>(), 1);
+    assert_eq!(generic_call_counter::<i32>(), 2);
+    assert_eq!(generic_call_counter::<i32>(), 3);
+
+    // Works with f32
+    assert_eq!(generic_call_counter::<f32>(), 1.0);
+    assert_eq!(generic_call_counter::<f32>(), 2.0);
+    assert_eq!(generic_call_counter::<f32>(), 3.0);
 }
 ```
 
