@@ -10,9 +10,9 @@ use std::cell::UnsafeCell;
 /// ```rust
 /// use std::sync::Mutex;
 ///
-/// fn generic_function<T: Copy + std::ops::Add<Output = T> + 'static>(initializer: fn() -> Mutex<T>) -> T {
+/// fn generic_exponential_counter<T: Copy + std::ops::Add<Output = T> + 'static>(first_value: T) -> T {
 ///     {
-///         let mut a = generic_singleton::get_or_init!(initializer).lock().unwrap();
+///         let mut a = generic_singleton::get_or_init!(|| Mutex::new(first_value)).lock().unwrap();
 ///         let b = *a;
 ///         *a = *a + b;
 ///         *a
@@ -20,13 +20,15 @@ use std::cell::UnsafeCell;
 /// }
 ///
 /// fn main() {
-///     assert_eq!(generic_function(||Mutex::new(2)), 4);
-///     assert_eq!(generic_function(||Mutex::new(2)), 8);
-///     assert_eq!(generic_function(||Mutex::new(2)), 16);
+///     // Works with i32
+///     assert_eq!(generic_exponential_counter(2), 4);
+///     assert_eq!(generic_exponential_counter(2), 8);
+///     assert_eq!(generic_exponential_counter(2), 16);
 ///
-///     assert_eq!(generic_function(||Mutex::new(2.0)), 4.0);
-///     assert_eq!(generic_function(||Mutex::new(2.0)), 8.0);
-///     assert_eq!(generic_function(||Mutex::new(2.0)), 16.0);
+///     // Works with f64
+///     assert_eq!(generic_exponential_counter(2.0), 4.0);
+///     assert_eq!(generic_exponential_counter(2.0), 8.0);
+///     assert_eq!(generic_exponential_counter(2.0), 16.0);
 /// }
 /// ```
 #[macro_export]
