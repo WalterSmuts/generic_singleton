@@ -45,8 +45,8 @@ fn main() {
 ```
 
 ### Current limitations:
-- Each thread has a different map. I may add `get_or_init_local` and `get_or_init_global` if I
-can figure out how to implement concurrent access and the required trait bound to make it safe.
+- The map is guarded by an RwLock for thread-safety. This is unnecessary in
+  single-threaded situations.
 
 [static generic items]: https://doc.rust-lang.org/reference/items/static-items.html#statics--generics
 [anymap]: https://docs.rs/anymap/latest/anymap/
