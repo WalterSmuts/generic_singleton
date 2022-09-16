@@ -11,8 +11,8 @@ parameter. This crate allows for this pattern with minimal runtime overhead.
 
 `generic_singleton` uses [anymap] behind the scenes to store a map of each
 generic type. The first time you hit the `get_or_init` macro we initialize the
-singleton in thread local storage. Subsequent calls to `get_or_init` will
-retrieve the singleton from the map.
+singleton. Subsequent calls to `get_or_init` will retrieve the singleton from
+the map.
 
 ### Example
 ```rust
