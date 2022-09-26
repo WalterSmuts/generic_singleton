@@ -6,6 +6,8 @@ pub extern crate anymap;
 #[doc(hidden)]
 pub mod static_anymap;
 pub extern crate lazy_static;
+#[doc(hidden)]
+pub mod thread_local_static_anymap;
 
 /// Get a static reference to a generic singleton or initialize it if it doesn't exist.
 ///
@@ -66,12 +68,77 @@ macro_rules! get_or_init {
     }};
 }
 
+/// Same as the [get_or_init!] macro but using thread local storage. Similar to the [thread_local!]
+/// macro API, we use a closure that yields a mutable reference to your struct. The closure ensures
+/// the reference cannot escape to a different thread.
+///
+/// ### Example
+/// ```rust
+/// use num_traits::{One, Zero};
+/// use std::ops::AddAssign;
+///
+/// fn generic_call_counter<T: Zero + One + Copy + AddAssign + Send + 'static>() -> T {
+///     let mut output = T::zero();
+///     generic_singleton::get_or_init_thread_local!(|| T::zero(), |count| {
+///         *count += T::one();
+///         output = *count;
+///     });
+///     output
+/// }
+///
+/// fn main() {
+///     // Works with usize
+///     assert_eq!(generic_call_counter::<usize>(), 1);
+///     assert_eq!(generic_call_counter::<usize>(), 2);
+///     assert_eq!(generic_call_counter::<usize>(), 3);
+///
+///     // Works with i32
+///     assert_eq!(generic_call_counter::<i32>(), 1);
+///     assert_eq!(generic_call_counter::<i32>(), 2);
+///     assert_eq!(generic_call_counter::<i32>(), 3);
+///
+///     // Works with f32
+///     assert_eq!(generic_call_counter::<f32>(), 1.0);
+///     assert_eq!(generic_call_counter::<f32>(), 2.0);
+///     assert_eq!(generic_call_counter::<f32>(), 3.0);
+/// }
+/// ```
+#[macro_export]
+macro_rules! get_or_init_thread_local {
+     ($init:expr, $with:expr) => {{
+         use $crate::thread_local_static_anymap::ThreadLocalStaticAnymap;
+         thread_local!(static STATIC_ANY_MAP: ThreadLocalStaticAnymap = ThreadLocalStaticAnymap::default());
+         // SAFETY:
+         // The reference to the STATIC_ANY_MAP is contained within this macro soo the $init
+         // expression cannot possibly reference it.
+         unsafe {STATIC_ANY_MAP.with(|map| {
+             map.get_or_init_with($init, $with)
+         })}
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn testing_function() -> &'static i32 {
         get_or_init!(|| 0)
+    }
+
+    fn local_testing_function() -> i32 {
+        let mut r = 0;
+        get_or_init_thread_local!(|| 0, |a| {
+            *a += 1;
+            r = *a;
+        });
+        r
+    }
+
+    #[test]
+    fn thread_local_works() {
+        assert_eq!(local_testing_function(), 1);
+        assert_eq!(local_testing_function(), 2);
+        assert_eq!(local_testing_function(), 3);
     }
 
     #[test]
