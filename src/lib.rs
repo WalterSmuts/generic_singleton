@@ -5,6 +5,7 @@ pub extern crate anymap;
 
 #[doc(hidden)]
 pub mod static_anymap;
+pub extern crate lazy_static;
 
 /// Get a static reference to a generic singleton or initialize it if it doesn't exist.
 ///
@@ -55,9 +56,10 @@ pub mod static_anymap;
 #[macro_export]
 macro_rules! get_or_init {
     ($init:expr) => {{
+        use $crate::lazy_static::lazy_static;
         use $crate::static_anymap::StaticAnyMap;
 
-        lazy_static::lazy_static! {
+        lazy_static! {
             static ref STATIC_ANY_MAP: StaticAnyMap = StaticAnyMap::default();
         }
         STATIC_ANY_MAP.get_or_init($init)
