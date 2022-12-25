@@ -20,7 +20,7 @@ use std::{cell::RefCell, ops::AddAssign};
 
 use num_traits::{One, Zero};
 
-fn generic_call_counter<T: Zero + One + Copy + AddAssign + 'static>() -> T {
+fn generic_call_counter<T: Zero + One + Copy + AddAssign + Send + 'static>() -> T {
     let mut count = generic_singleton::get_or_init!(|| RefCell::new(T::zero())).borrow_mut();
     *count += T::one();
     *count

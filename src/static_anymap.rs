@@ -32,7 +32,7 @@ pub struct StaticAnyMap {
 unsafe impl Sync for StaticAnyMap {}
 
 impl StaticAnyMap {
-    fn get<T>(&'static self) -> Option<&'static T> {
+    fn get<T: Send>(&'static self) -> Option<&'static T> {
         let read_only_guard = self.inner.read();
         let val = read_only_guard.get::<Pin<Box<T>>>()?;
         // SAFETY:
@@ -42,7 +42,7 @@ impl StaticAnyMap {
         Some(unsafe { convert_to_static_ref(val) })
     }
 
-    fn init_and_return<T>(&'static self, init: impl FnOnce() -> T) -> &'static T {
+    fn init_and_return<T: Send>(&'static self, init: impl FnOnce() -> T) -> &'static T {
         let mut writeable_map = self.inner.write();
 
         // Check again to be sure that the type wasn't inserted after we dropped the fast-path
@@ -67,7 +67,7 @@ impl StaticAnyMap {
         unsafe { convert_to_static_ref(val) }
     }
 
-    pub fn get_or_init<T>(&'static self, init: impl FnOnce() -> T) -> &'static T {
+    pub fn get_or_init<T: Send>(&'static self, init: impl FnOnce() -> T) -> &'static T {
         if let Some(val) = self.get() {
             val
         } else {

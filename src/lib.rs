@@ -22,7 +22,7 @@ pub extern crate lazy_static;
 ///     a * b
 /// }
 ///
-/// fn multiply_with_cache<T: Mul<Output = T>>(a: T, b: T) -> T
+/// fn multiply_with_cache<T: Mul<Output = T> + Send>(a: T, b: T) -> T
 /// where
 ///     T: std::cmp::Eq,
 ///     T: Copy,
