@@ -4,9 +4,9 @@ use anymap::AnyMap;
 use parking_lot::RwLock;
 
 /// The point of this struct is to wrap the AnyMap in a concurrent, static version that will only
-/// insert items that have 'static lifetimes. This is acieved by wrapping all items in Pin<Box<T>>
-/// and never removing items. This module only exposes the StaticAnyMap struct and it's get_or_init
-/// method. Using these should be perfectly safe.
+/// insert items that have 'static lifetimes. This is acieved by wrapping all items in
+/// `Pin<Box<T>>` and never removing items. This module only exposes the StaticAnyMap struct and
+/// it's get_or_init method. Using these should be perfectly safe.
 #[derive(Default)]
 pub struct StaticAnyMap {
     inner: RwLock<AnyMap>,

@@ -2,7 +2,7 @@ use anymap::AnyMap;
 use std::cell::UnsafeCell;
 
 /// The point of this struct is to wrap the AnyMap in a thread local, version that will only insert
-/// items that have 'static lifetimes. This is acieved by wrapping all items in Box<T> and never
+/// items that have 'static lifetimes. This is acieved by wrapping all items in `Box<T>` and never
 /// removing items. This module only exposes the ThreadLocalStaticAnymap struct and it's
 /// get_or_init_with method. Using these should be perfectly safe.
 #[derive(Default)]
