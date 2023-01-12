@@ -44,10 +44,16 @@ fn main() {
 }
 ```
 
-### Current limitations:
-- The map is guarded by an RwLock for thread-safety. This is unnecessary in
-  single-threaded situations.
+### Thread Local variant
+
+The example shown above has a drawback of requiring an `RwLock` to ensure
+synchronisation around the inner [AnyMap]. In single-threaded situations we can
+remove this lock and provide mutable references directly using the
+`get_or_init_thread_local!` macro. This comes at the cost of ergonomics,
+requiring you to express your logic in a closure rather than simply returning a
+reference.
 
 [static generic items]: https://doc.rust-lang.org/reference/items/static-items.html#statics--generics
 [anymap]: https://docs.rs/anymap/latest/anymap/
+[AnyMap]: https://docs.rs/anymap/latest/anymap/type.AnyMap.html
 [new type pattern]: https://doc.rust-lang.org/rust-by-example/generics/new_types.html
