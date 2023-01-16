@@ -45,20 +45,7 @@ impl StaticAnyMap {
     fn init_and_return<T: Send>(&'static self, init: impl FnOnce() -> T) -> &'static T {
         let mut writeable_map = self.inner.write();
 
-        // Check again to be sure that the type wasn't inserted after we dropped the fast-path
-        // read-only lock.
-        if !writeable_map.contains::<Pin<Box<T>>>() {
-            writeable_map.insert(Box::pin(init()));
-        }
-        let read_only_guard = parking_lot::lock_api::RwLockWriteGuard::<
-            '_,
-            parking_lot::RawRwLock,
-            anymap::Map,
-        >::downgrade(writeable_map);
-        // SAFETY:
-        // Three lines above we insert the T if the map contains nothing. Since we're holding a lock
-        // the entire time, it's impossible that the map does not contain the T.
-        let val = unsafe { read_only_guard.get::<Pin<Box<T>>>().unwrap_unchecked() };
+        let val = writeable_map.entry().or_insert_with(|| Box::pin(init()));
 
         // SAFETY:
         // Since we only insert values into the map and we wrap the values in Pin<Box<T>> and the

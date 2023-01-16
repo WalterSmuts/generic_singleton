@@ -49,14 +49,9 @@ impl ThreadLocalStaticAnymap {
         // SAFETY:
         // The map is always created normally, therefore this pointer cannot be null.
         let map = unsafe { optional_map.unwrap_unchecked() };
-        if !map.contains::<UnsafeCell<Box<T>>>() {
-            map.insert(UnsafeCell::new(Box::new(init())));
-        };
-        let optional_unsafe_t_ref = map.get::<UnsafeCell<Box<T>>>();
-        // SAFETY:
-        // We always insert into the map if it doesn't exist 3 lines above so this must be a Some
-        // variant.
-        let unsafe_t_ref = unsafe { optional_unsafe_t_ref.unwrap_unchecked() };
+        let unsafe_t_ref = map
+            .entry()
+            .or_insert_with(|| UnsafeCell::new(Box::new(init())));
 
         let t_pointer = unsafe_t_ref.get();
         // SAFETY:
