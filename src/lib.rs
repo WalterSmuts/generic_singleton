@@ -14,9 +14,9 @@ pub mod thread_local_static_anymap;
 ///
 /// ### Example
 /// ```rust
-/// use std::cell::RefCell;
 /// use std::collections::HashMap;
 /// use std::ops::{Deref, DerefMut, Mul};
+/// use std::sync::RwLock;
 ///
 /// // The expensive function we're trying to cache using a singleton map, however,
 /// // we want the user of the function to determine the type of the elements being
@@ -29,17 +29,17 @@ pub mod thread_local_static_anymap;
 /// where
 ///     T: std::cmp::Eq,
 ///     T: Copy,
-///     T: 'static,
+///     T: Sync + 'static,
 ///     (T, T): std::hash::Hash,
 /// {
 ///     // This is a generic singleton map!!!
-///     let map = generic_singleton::get_or_init!(|| RefCell::new(HashMap::new()));
+///     let map = generic_singleton::get_or_init!(|| RwLock::new(HashMap::new()));
 ///     let key = (a, b);
-///     if map.borrow().contains_key(&key) {
-///         *map.borrow().get(&key).unwrap()
+///     if map.read().unwrap().contains_key(&key) {
+///         *map.read().unwrap().get(&key).unwrap()
 ///     } else {
 ///         let result = multiply(a, b);
-///         map.borrow_mut().insert(key, result);
+///         map.write().unwrap().insert(key, result);
 ///         result
 ///     }
 /// }
