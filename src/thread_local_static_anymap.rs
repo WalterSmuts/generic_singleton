@@ -1,5 +1,5 @@
 use anymap::AnyMap;
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::UnsafeCell;
 
 /// The point of this struct is to wrap the AnyMap in a thread local, version that will only insert
 /// items that have 'static lifetimes. This is acieved by wrapping all items in `Box<T>` and never
@@ -19,12 +19,8 @@ impl ThreadLocalStaticAnymap {
     /// Users need to ensure this is only called from a ThreadLocalStaticAnymap in thread local
     /// storge and that the `with` closure doesn't contain references to the same
     /// ThreadLocalStaticAnymap.
-    pub fn get_or_init_with<T: 'static>(
-        &self,
-        init: impl FnOnce() -> T,
-        with: impl FnOnce(&mut T),
-    ) {
-        let optional_t: &UnsafeCell<Option<RefCell<T>>> = {
+    pub fn get_or_init_with<T: 'static>(&self, init: impl FnOnce() -> T, with: impl FnOnce(&T)) {
+        let optional_t: &UnsafeCell<Option<T>> = {
             // SAFETY:
             // The pointer returned by `self.inner.get()` is guarantee to be valid, properly aligned
             // and point to a valid `T` because it comes from `self.inner`, which must be valid.
@@ -61,7 +57,7 @@ impl ThreadLocalStaticAnymap {
             // SAFETY:
             // Nothing is borrowing `optional_t` at the moment, nor we run `init` or `with` while
             // we're holding on this borrow.
-            unsafe { *optional_t.get() = Some(RefCell::new(value)) };
+            unsafe { *optional_t.get() = Some(value) };
         }
 
         // SAFETY:
@@ -76,9 +72,7 @@ impl ThreadLocalStaticAnymap {
         // have been initialized at the end of the previous `if`.
         let t_ref = unsafe { optional_t_ref.as_ref().unwrap_unchecked() };
 
-        // Note: The `RefCell` here is needed because `with` could reentratly access `self`.
-        // This is the same reason as for why `thread_local!` gives out only an `&T` in its `with`.
-        with(&mut *t_ref.borrow_mut())
+        with(t_ref)
     }
 }
 
