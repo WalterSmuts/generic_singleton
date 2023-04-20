@@ -157,4 +157,74 @@ mod tests {
 
         println!("{v}"); // Check for use-after-free, to be sure bugs are caught, run with miri
     }
+
+    #[ignore = "deadlocks"]
+    #[test]
+    fn recursive_call_to_get_or_init_deadlocks() {
+        fn recursive(first: bool) {
+            get_or_init!(|| {
+                if first {
+                    recursive(false)
+                }
+            });
+        }
+        recursive(true)
+    }
+
+    #[test]
+    #[should_panic]
+    fn recursive_call_to_get_or_init_thread_local_init_panics() {
+        fn recursive(first: bool) {
+            get_or_init_thread_local!(
+                || {
+                    if first {
+                        recursive(false)
+                    }
+                },
+                |_| ()
+            );
+        }
+        recursive(true)
+    }
+
+    #[test]
+    #[should_panic]
+    fn recursive_call_to_get_or_init_thread_local_get_panics() {
+        fn recursive(first: bool) {
+            // Explicit `&mut` because if it was a `&` it would be ok.
+            get_or_init_thread_local!(|| (), |_: &mut _| {
+                if first {
+                    recursive(false)
+                }
+            });
+        }
+        recursive(true)
+    }
 }
+
+// Compile tests
+
+// Note: compile_fail tests need to be in a public module that exists even when `cfg(not(test))`
+// otherwise the compiler won't execute them.
+
+/// ```compile_fail
+/// use generic_singleton::get_or_init;
+///
+/// fn check_static_dont_leak_unsafe() {
+///     unsafe fn not_safe() {}
+///
+///     get_or_init!(|| not_safe());
+/// }
+/// ```
+const _: () = ();
+
+/// ```compile_fail
+/// use generic_singleton::get_or_init_thread_local;
+///
+/// fn check_thread_local_dont_leak_unsafe() {
+///     unsafe fn not_safe() {}
+///
+///     get_or_init_thread_local!(|| not_safe());
+/// }
+/// ```
+const _: () = ();
