@@ -76,13 +76,16 @@ macro_rules! get_or_init {
 /// ### Example
 /// ```rust
 /// use num_traits::{One, Zero};
+/// use std::cell::Cell;
 /// use std::ops::AddAssign;
 ///
 /// fn generic_call_counter<T: Zero + One + Copy + AddAssign + Send + 'static>() -> T {
 ///     let mut output = T::zero();
-///     generic_singleton::get_or_init_thread_local!(|| T::zero(), |count| {
-///         *count += T::one();
-///         output = *count;
+///     generic_singleton::get_or_init_thread_local!(|| Cell::new(T::zero()), |count_cell| {
+///         let mut count = count_cell.get();
+///         count += T::one();
+///         count_cell.set(count);
+///         output = count;
 ///     });
 ///     output
 /// }
@@ -122,10 +125,11 @@ mod tests {
     }
 
     fn local_testing_function() -> i32 {
+        use std::cell::Cell;
         let mut r = 0;
-        get_or_init_thread_local!(|| 0, |a| {
-            *a += 1;
-            r = *a;
+        get_or_init_thread_local!(|| Cell::new(0), |a| {
+            a.set(a.get() + 1);
+            r = a.get();
         });
         r
     }
@@ -188,11 +192,10 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn recursive_call_to_get_or_init_thread_local_get_panics() {
+    fn recursive_call_to_get_or_init_thread_local_get_works() {
         fn recursive(first: bool) {
-            // Explicit `&mut` because if it was a `&` it would be ok.
-            get_or_init_thread_local!(|| (), |_: &mut _| {
+            // Explicit `&` because if it was a `&mut` it would not be ok.
+            get_or_init_thread_local!(|| (), |_: &_| {
                 if first {
                     recursive(false)
                 }
