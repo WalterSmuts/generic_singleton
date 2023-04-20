@@ -16,19 +16,10 @@ pub struct StaticAnyMap {
 // From the rustonomicon:
 // https://doc.rust-lang.org/nomicon/send-and-sync.html
 // "A type is Sync if it is safe to share between threads (T is Sync if and only if &T is Send)."
-// All accessors are only implemented for 'static references, so I believe we can say &T ('static
-// implied) is Send. And since any mutation is guarded by a RwLock, the type should be sync too.
-//
-// I'm a bit uncertain about the above. I've managed to limit access to the inner AnyMap via
-// 'static references, but there's nothing stopping a user from creating a non-'static
-// StaticAnyMap. The impl below allows to send it between threads, even if the type is not
-// 'static. This instance would be unusable but perhaps it can still trigger UB. For example in
-// the following podcast at ~14:10, Andrew Kelly mentions the existence of a dangling pointer
-// might cause undefined behaviour:
-// https://rustacean-station.org/episode/andrew-kelley/
-// I'm concerned that, similar to the dangling pointer example, the existence of a struct that is
-// shared across thread boundaries which shouldn't already triggers UB regardless of whether it's
-// actually accessed.
+// All accessors are only implemented for `T: Sync`, so we can say &T ('static implied) is Send.
+// Since we never return `&mut T` we can safely store `!Send` data as long as `StaticAnyMap`
+// remains `!Send` (which it currently is, though it would be nice to have a test for that).
+// Since any accessor implicitly requires `T: 'static` we can assume there's no dangling data.
 unsafe impl Sync for StaticAnyMap {}
 
 impl StaticAnyMap {
