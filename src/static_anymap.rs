@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::pin::Pin;
 
 use anymap::AnyMap;
@@ -10,6 +11,9 @@ use parking_lot::RwLock;
 #[derive(Default)]
 pub struct StaticAnyMap {
     inner: RwLock<AnyMap>,
+    /// This guarantees that `StaticAnyMap` remains `!Send` (even though `AnyMap` is already `!Send`),
+    /// which allows accessors to safely avoid requiring `T: Send`.
+    _phantom: PhantomData<*mut ()>,
 }
 
 // SAFETY:
