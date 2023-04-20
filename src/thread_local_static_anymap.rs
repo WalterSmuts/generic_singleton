@@ -1,5 +1,5 @@
 use anymap::AnyMap;
-use std::cell::UnsafeCell;
+use std::cell::{RefCell, UnsafeCell};
 
 /// The point of this struct is to wrap the AnyMap in a thread local, version that will only insert
 /// items that have 'static lifetimes. This is acieved by wrapping all items in `Box<T>` and never
@@ -19,70 +19,65 @@ impl ThreadLocalStaticAnymap {
     /// Users need to ensure this is only called from a ThreadLocalStaticAnymap in thread local
     /// storge and that the `with` closure doesn't contain references to the same
     /// ThreadLocalStaticAnymap.
-    pub unsafe fn get_or_init_with<T: 'static>(
+    pub fn get_or_init_with<T: 'static>(
         &self,
         init: impl FnOnce() -> T,
         mut with: impl FnMut(&mut T),
     ) {
-        let map_pointer = self.inner.get();
-        // SAFETY:
-        // Check:
-        // * The pointer must be properly aligned.
-        // * It must be "dereferenceable" in the sense defined in [the module documentation].
-        // * The pointer must point to an initialized instance of `T`.
-        // Proof:
-        // * The pointer was allocated via normal rust methods in safe code and obtained from an
-        // `UnsafeCell` one line above. The pointer cannot be unaligned and has to be
-        // dereferenceable.
-        //
-        // Check:
-        // * You must enforce Rust's aliasing rules, since the returned lifetime `'a` is
-        //   arbitrarily chosen and does not necessarily reflect the actual lifetime of the data.
-        //   In particular, while this reference exists, the memory the pointer points to must
-        //   not get accessed (read or written) through any other pointer.
-        // Proof:
-        // * This can be broken by referencing the same ThreadLocalStaticAnymap in the `with`
-        // closure. That's why this function is still marked `unsafe`. Any user needs to ensure
-        // there's no way that the same ThreadLocalStaticAnymap can be used in the `with` closure.
-        let optional_map = unsafe { map_pointer.as_mut() };
+        let optional_t: &UnsafeCell<Option<RefCell<T>>> = {
+            // SAFETY:
+            // The pointer returned by `self.inner.get()` is guarantee to be valid, properly aligned
+            // and point to a valid `T` because it comes from `self.inner`, which must be valid.
+            //
+            // The only tricky requisite is guaranteeing that there aren't aliasing references. This is
+            // true because `ThreadLocalStaticAnymap` is `!Sync`, so this must be the only thread
+            // with a reference to it, and we never call `init` or `with` when we're holding a reference
+            // to `map` because its scope is limited to this block.
+            //
+            // Note that while `optional_t` borrows from `map`, it does from a value inside a
+            // `Pin<Box<_>>`, which will remain valid even if others borrow from `map`.
+            let map = unsafe { &mut *self.inner.get() };
+            map.entry()
+                .or_insert_with(|| Box::pin(UnsafeCell::new(None)))
+        };
+
+        // TODO: Replace the `Option` with `std::cell::Once`, this will allow to avoid any
+        // `unsafe` needed to access `optional_t`.
 
         // SAFETY:
-        // The map is always created normally, therefore this pointer cannot be null.
-        let map = unsafe { optional_map.unwrap_unchecked() };
-        let unsafe_t_ref = map
-            .entry()
-            .or_insert_with(|| UnsafeCell::new(Box::new(init())));
+        // Nothing is borrowing `optional_t` at the moment, nor we run `init` or `with` while
+        // we're holding on this borrow.
+        if unsafe { (*optional_t.get()).is_none() } {
+            let value = init();
 
-        let t_pointer = unsafe_t_ref.get();
-        // SAFETY:
-        // Check:
-        // * The pointer must be properly aligned.
-        // * It must be "dereferenceable" in the sense defined in [the module documentation].
-        // Proof:
-        // * The pointer was allocated via normal rust methods in safe code and obtained from an
-        // UnsafeCell one line above. The pointer cannot be unaligned and has to be
-        // dereferenceable.
-        //
-        // Check:
-        // * The pointer must point to an initialized instance of `T`.
-        // Proof:
-        // The AnyMap crate guarantees this for us.
-        //
-        // Check:
-        // * You must enforce Rust's aliasing rules, since the returned lifetime `'a` is
-        //   arbitrarily chosen and does not necessarily reflect the actual lifetime of the data.
-        //   In particular, while this reference exists, the memory the pointer points to must
-        //   not get accessed (read or written) through any other pointer.
-        // Proof:
-        // * This can be broken by referencing the same ThreadLocalStaticAnymap in the `with`
-        // closure. That's why this function is still marked `unsafe`. Any user needs to ensure
-        // there's no way that the same ThreadLocalStaticAnymap can be used in the `with` closure.
-        let optional_t_ref = unsafe { t_pointer.as_mut() };
+            // If now `optional_t` is `some` it means `init` reentrantly accessed `self`
+            // and initialized the value for `T`.
+            //
+            // SAFETY:
+            // Nothing is borrowing `optional_t` at the moment, nor we run `init` or `with` while
+            // we're holding on this borrow.
+            assert!(unsafe { (*optional_t.get()).is_none() }, "reentrant init");
+
+            // SAFETY:
+            // Nothing is borrowing `optional_t` at the moment, nor we run `init` or `with` while
+            // we're holding on this borrow.
+            unsafe { *optional_t.get() = Some(RefCell::new(value)) };
+        }
 
         // SAFETY:
-        // The reference we get back from AnyMap is already proved to be valid, therefore this
-        // cannot be null either.
-        let t_ref = unsafe { optional_t_ref.unwrap_unchecked() };
-        with(t_ref);
+        // Nothing is borrowing `optional_t` at the moment, and running `with` later is safe because
+        // we initialized `optional_t` with `Some`, so even if `with` reentrantly accesses `self`
+        // it won't be able to write to `optional_t` or even create a mutable reference, so this
+        // reference will remain valid.
+        let optional_t_ref = unsafe { &*optional_t.get() };
+
+        // SAFETY:
+        // `optional_t_ref` is guaranteed to be `Some` because if it were `None` then it would
+        // have been initialized at the end of the previous `if`.
+        let t_ref = unsafe { optional_t_ref.as_ref().unwrap_unchecked() };
+
+        // Note: The `RefCell` here is needed because `with` could reentratly access `self`.
+        // This is the same reason as for why `thread_local!` gives out only an `&T` in its `with`.
+        with(&mut *t_ref.borrow_mut())
     }
 }

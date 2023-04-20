@@ -109,11 +109,7 @@ macro_rules! get_or_init_thread_local {
     ($init:expr, $with:expr) => {{
         use $crate::thread_local_static_anymap::ThreadLocalStaticAnymap;
         thread_local!(static STATIC_ANY_MAP: ThreadLocalStaticAnymap = ThreadLocalStaticAnymap::default());
-
-        // SAFETY:
-        // The reference to the STATIC_ANY_MAP is contained within this macro soo the $init
-        // expression cannot possibly reference it.
-        STATIC_ANY_MAP.with(|map| unsafe { map.get_or_init_with($init, $with) })
+        STATIC_ANY_MAP.with(|map| map.get_or_init_with($init, $with))
     }};
 }
 
