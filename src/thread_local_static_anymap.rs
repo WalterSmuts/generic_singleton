@@ -81,3 +81,36 @@ impl ThreadLocalStaticAnymap {
         with(&mut *t_ref.borrow_mut())
     }
 }
+
+// Compile tests
+
+// Note: compile_fail tests need to be in a public module that exists even when `cfg(not(test))`
+// otherwise the compiler won't execute them.
+
+/// ```compile_fail
+/// use generic_singleton::thread_local_static_anymap::ThreadLocalStaticAnymap;
+///
+/// fn check_not_send() where ThreadLocalStaticAnymap: Send {}
+/// ```
+const _: () = ();
+
+/// ```compile_fail
+/// use generic_singleton::thread_local_static_anymap::ThreadLocalStaticAnymap;
+///
+/// fn check_not_sync() where ThreadLocalStaticAnymap: Sync {}
+/// ```
+const _: () = ();
+
+/// ```compile_fail
+/// use generic_singleton::thread_local_static_anymap::ThreadLocalStaticAnymap;
+///
+/// fn check_t_needs_static<T: Default>(map: &'static ThreadLocalStaticAnymap) {
+///     map.get_or_init_with::<T>(T::default, |_| ());
+/// }
+/// ```
+const _: () = ();
+
+#[allow(unused)]
+fn check_t_needs_not_sync_not_send<T: Default + 'static>(map: &'static ThreadLocalStaticAnymap) {
+    map.get_or_init_with::<T>(T::default, |_| ());
+}

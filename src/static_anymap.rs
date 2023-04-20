@@ -83,3 +83,45 @@ unsafe fn convert_to_static_ref<T>(pin: &Pin<Box<T>>) -> &'static T {
     // from a valid reference, therefore this is considered safe to do.
     unsafe { optional_ref.unwrap_unchecked() }
 }
+
+// Compile tests
+
+// Note: compile_fail tests need to be in a public module that exists even when `cfg(not(test))`
+// otherwise the compiler won't execute them.
+
+/// ```compile_fail
+/// use generic_singleton::static_anymap::StaticAnyMap;
+///
+/// fn check_not_send() where StaticAnyMap: Send {}
+/// ```
+const _: () = ();
+
+#[allow(unused)]
+fn check_sync()
+where
+    StaticAnyMap: Sync,
+{
+}
+
+/// ```compile_fail
+/// use generic_singleton::static_anymap::StaticAnyMap;
+///
+/// fn check_t_needs_sync<T: Default + 'static>(map: &'static StaticAnyMap) {
+///     map.get_or_init::<T>(T::default);
+/// }
+/// ```
+const _: () = ();
+
+/// ```compile_fail
+/// use generic_singleton::static_anymap::StaticAnyMap;
+///
+/// fn check_t_needs_static<T: Default + Sync>(map: &'static StaticAnyMap) {
+///     map.get_or_init::<T>(T::default);
+/// }
+/// ```
+const _: () = ();
+
+#[allow(unused)]
+fn check_t_needs_sync_not_send<T: Default + Sync + 'static>(map: &'static StaticAnyMap) {
+    map.get_or_init::<T>(T::default);
+}
