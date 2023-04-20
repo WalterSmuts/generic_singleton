@@ -22,7 +22,7 @@ impl ThreadLocalStaticAnymap {
     pub fn get_or_init_with<T: 'static>(
         &self,
         init: impl FnOnce() -> T,
-        mut with: impl FnMut(&mut T),
+        with: impl FnOnce(&mut T),
     ) {
         let optional_t: &UnsafeCell<Option<RefCell<T>>> = {
             // SAFETY:
