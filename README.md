@@ -1,4 +1,7 @@
 # generic\_singleton
+[![crates.io](https://img.shields.io/crates/v/generic_singleton.svg)](https://crates.io/crates/generic_singleton)
+[![Documentation](https://docs.rs/generic_singleton/badge.svg)](https://docs.rs/generic_singleton)
+
 Rust does NOT monomorphize it's [static generic items]. This means you cannot
 use a generic static item in a generic function. You'll get the following
 error:
