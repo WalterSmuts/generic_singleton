@@ -1,4 +1,4 @@
-use anymap::AnyMap;
+use anymap3::AnyMap;
 use std::cell::UnsafeCell;
 
 /// The point of this struct is to wrap the AnyMap in a thread local, version that will only insert

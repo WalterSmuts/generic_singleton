@@ -1,6 +1,6 @@
 use std::pin::Pin;
 
-use anymap::AnyMap;
+use anymap3::AnyMap;
 use parking_lot::RwLock;
 
 /// The point of this struct is to wrap the AnyMap in a concurrent, static version that will only

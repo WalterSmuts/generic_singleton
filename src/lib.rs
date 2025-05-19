@@ -2,7 +2,7 @@
 #![deny(clippy::undocumented_unsafe_blocks)]
 #![deny(unsafe_op_in_unsafe_fn)]
 #![doc = include_str!("../README.md")]
-pub extern crate anymap;
+extern crate anymap3;
 
 #[doc(hidden)]
 pub mod static_anymap;
