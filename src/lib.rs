@@ -6,7 +6,6 @@ extern crate anymap3;
 
 #[doc(hidden)]
 pub mod static_anymap;
-pub extern crate lazy_static;
 #[doc(hidden)]
 pub mod thread_local_static_anymap;
 
@@ -59,13 +58,11 @@ pub mod thread_local_static_anymap;
 #[macro_export]
 macro_rules! get_or_init {
     ($init:expr) => {{
-        use $crate::lazy_static::lazy_static;
+        use std::sync::OnceLock;
         use $crate::static_anymap::StaticAnyMap;
 
-        lazy_static! {
-            static ref STATIC_ANY_MAP: StaticAnyMap = StaticAnyMap::default();
-        }
-        STATIC_ANY_MAP.get_or_init($init)
+        static STATIC_ANY_MAP: OnceLock<StaticAnyMap> = OnceLock::new();
+        STATIC_ANY_MAP.get_or_init(StaticAnyMap::default).get_or_init($init)
     }};
 }
 
@@ -118,7 +115,6 @@ macro_rules! get_or_init_thread_local {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     fn testing_function() -> &'static i32 {
         get_or_init!(|| 0)
@@ -150,7 +146,7 @@ mod tests {
 
     #[test]
     fn recursive_call_to_get_or_init_does_not_panic() {
-        get_or_init!(|| get_or_init!(|| 0));
+        let _ = get_or_init!(|| get_or_init!(|| 0));
     }
 
     #[test]
@@ -166,7 +162,7 @@ mod tests {
     #[test]
     fn recursive_call_to_get_or_init_deadlocks() {
         fn recursive(first: bool) {
-            get_or_init!(|| {
+            let _ = get_or_init!(|| {
                 if first {
                     recursive(false)
                 }

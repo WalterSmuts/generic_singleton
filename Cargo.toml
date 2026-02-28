@@ -2,6 +2,7 @@
 name = "generic_singleton"
 version = "0.5.1"
 edition = "2021"
+rust-version = "1.70"
 authors = ["Walter Smuts <smuts.walter@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "A library crate allowing for generic singleton patterns"
@@ -15,7 +16,6 @@ readme = "README.md"
 
 [dependencies]
 anymap3 = "1.0.1"
-lazy_static = "1.4.0"
 parking_lot = "0.12.1"
 
 [dev-dependencies]

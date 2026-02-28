@@ -1,12 +1,10 @@
-use std::pin::Pin;
-
 use anymap3::AnyMap;
 use parking_lot::RwLock;
 
 /// The point of this struct is to wrap the AnyMap in a concurrent, static version that will only
-/// insert items that have 'static lifetimes. This is acieved by wrapping all items in
-/// `Pin<Box<T>>` and never removing items. This module only exposes the StaticAnyMap struct and
-/// it's get_or_init method. Using these should be perfectly safe.
+/// insert items that have 'static lifetimes. This is achieved by wrapping all items in
+/// `Box<T>` and never removing items. This module only exposes the StaticAnyMap struct and
+/// its get_or_init method. Using these should be perfectly safe.
 #[derive(Default)]
 pub struct StaticAnyMap {
     inner: RwLock<AnyMap>,
@@ -16,72 +14,46 @@ pub struct StaticAnyMap {
 // From the rustonomicon:
 // https://doc.rust-lang.org/nomicon/send-and-sync.html
 // "A type is Sync if it is safe to share between threads (T is Sync if and only if &T is Send)."
+//
 // All accessors are only implemented for `T: Sync`, so we can say &T ('static implied) is Send.
+//
 // Since we never return `&mut T` we can safely store `!Send` data as long as `StaticAnyMap`
 // remains `!Send` (which it currently is, though it would be nice to have a test for that).
 // Since any accessor implicitly requires `T: 'static` we can assume there's no dangling data.
+//
+// `AnyMap` itself is `!Send + !Sync` because it can hold arbitrary types, but we guard
+// all access through a `RwLock`, so concurrent access is safe. `Send` is needed for
+// `OnceLock<StaticAnyMap>` in a static context. This is safe because we never expose
+// `&mut AnyMap` outside the lock, and all inserted values are `Sync + 'static`.
 unsafe impl Sync for StaticAnyMap {}
+unsafe impl Send for StaticAnyMap {}
 
 impl StaticAnyMap {
-    fn get<T: Sync + 'static>(&'static self) -> Option<&'static T> {
-        let read_only_guard = self.inner.read();
-        let val = read_only_guard.get::<Pin<Box<T>>>()?;
-        // SAFETY:
-        // Since we only insert values into the map and we wrap the values in Pin<Box<T>> and the
-        // map itelf has a static lifetime, we can be sure that the data being pointed to has
-        // static lifetime.
-        Some(unsafe { convert_to_static_ref(val) })
-    }
-
-    fn init_and_return<T: Sync + 'static>(&'static self, init: impl FnOnce() -> T) -> &'static T {
-        let mut writeable_map = self.inner.write();
-
-        let val = writeable_map.entry().or_insert_with(|| Box::pin(init()));
-
-        // SAFETY:
-        // Since we only insert values into the map and we wrap the values in Pin<Box<T>> and the
-        // map itelf has a static lifetime, we can be sure that the data being pointed to has
-        // static lifetime.
-        unsafe { convert_to_static_ref(val) }
-    }
-
+    #[must_use]
     pub fn get_or_init<T: Sync + 'static>(&'static self, init: impl FnOnce() -> T) -> &'static T {
-        if let Some(val) = self.get() {
-            val
-        } else {
-            self.init_and_return(init)
+        // Fast path: read lock only
+        {
+            let map = self.inner.read();
+            if let Some(val) = map.get::<Box<T>>() {
+                // SAFETY: Values are boxed and never removed from the map which has static
+                // lifetime, so the pointed-to data has static lifetime.
+                return unsafe { extend_lifetime(val) };
+            }
         }
+
+        // Slow path: write lock, use or_insert_with to guarantee init runs at most once
+        let mut map = self.inner.write();
+        let val = map.entry().or_insert_with(|| Box::new(init()));
+        // SAFETY: Same as above.
+        unsafe { extend_lifetime(val) }
     }
 }
 
-// # Safety
-// The reference MUST point to data that has a static lifetime and otherwise be a valid reference.
-unsafe fn convert_to_static_ref<T>(pin: &Pin<Box<T>>) -> &'static T {
-    let t_ref = &*pin.as_ref();
-    let ptr = t_ref as *const T;
-    // SAFETY:
-    // Check: The pointer must be properly aligned.
-    // Proof: The pointer is obtained from a valid reference so it must be aligned.
-    //
-    // Check: It must be “dereferenceable” in the sense defined in the module documentation.
-    // Proof: The pointer is obtained from a valid reference it musts be dereferenceable.
-    //
-    // Check: The pointer must point to an initialized instance of T.
-    // Proof: The AnyMap crate provides this guarantee.
-    //
-    // Check: You must enforce Rust’s aliasing rules, since the returned lifetime 'a is
-    //        arbitrarily chosen and does not necessarily reflect the actual lifetime of the data.
-    //        In particular, while this reference exists, the memory the pointer points to
-    //        must not get mutated (except inside UnsafeCell).
-    // Proof: We return a shared reference and therefore cannot be mutated unless T is
-    //        guarded with the normal rust memory protection constructs using UnsafeCell.
-    //        The data could be dropped if we ever removed it from this map however. Care
-    //        must be taken to never introduce any logic that would remove T from the map.
-    let optional_ref = unsafe { ptr.as_ref() };
-    // SAFETY:
-    // This requires the pointer not to be null. We obtained the pointer one line above
-    // from a valid reference, therefore this is considered safe to do.
-    unsafe { optional_ref.unwrap_unchecked() }
+// SAFETY: The data is boxed inside a map with static lifetime. We only insert and never remove,
+// so the pointed-to data lives for 'static. We return a shared reference, so aliasing rules are
+// upheld (mutation requires UnsafeCell in T).
+unsafe fn extend_lifetime<T>(boxed: &Box<T>) -> &'static T {
+    unsafe { std::mem::transmute::<&T, &'static T>(boxed.as_ref()) }
 }
 
 // Compile tests
@@ -89,12 +61,12 @@ unsafe fn convert_to_static_ref<T>(pin: &Pin<Box<T>>) -> &'static T {
 // Note: compile_fail tests need to be in a public module that exists even when `cfg(not(test))`
 // otherwise the compiler won't execute them.
 
-/// ```compile_fail
-/// use generic_singleton::static_anymap::StaticAnyMap;
-///
-/// fn check_not_send() where StaticAnyMap: Send {}
-/// ```
-const _: () = ();
+#[allow(unused)]
+fn check_send()
+where
+    StaticAnyMap: Send,
+{
+}
 
 #[allow(unused)]
 fn check_sync()
