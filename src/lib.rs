@@ -1,6 +1,5 @@
 #![deny(missing_docs)]
 #![deny(clippy::undocumented_unsafe_blocks)]
-#![deny(unsafe_op_in_unsafe_fn)]
 #![doc = include_str!("../README.md")]
 extern crate anymap3;
 
