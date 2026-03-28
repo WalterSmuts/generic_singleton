@@ -1,9 +1,25 @@
 use anymap3::AnyMap;
 use parking_lot::RwLock;
+use std::ptr::NonNull;
+
+/// A wrapper around `NonNull<T>` that implements `Any` so it can be stored in an `AnyMap`.
+///
+/// We use `NonNull<T>` instead of `Box<T>` to avoid `Box`'s aliasing assertions.
+/// `Box<T>` is considered equivalent to `&mut T` for aliasing purposes, so storing
+/// `Box<T>` in the map and later creating `&mut AnyMap` (via `entry()`) would alias
+/// any previously handed-out `&'static T` references. `NonNull` is a raw pointer and
+/// does not participate in borrow tracking, breaking the aliasing chain.
+struct Leaked<T>(NonNull<T>);
+
+// SAFETY: The `T: Sync` bound on all public accessors ensures the pointee is safe to
+// share across threads. We never hand out `&mut T`.
+unsafe impl<T: Sync> Send for Leaked<T> {}
+// SAFETY: Same as above — T: Sync means &T is safe to share.
+unsafe impl<T: Sync> Sync for Leaked<T> {}
 
 /// The point of this struct is to wrap the AnyMap in a concurrent, static version that will only
-/// insert items that have 'static lifetimes. This is achieved by wrapping all items in
-/// `Box<T>` and never removing items. This module only exposes the StaticAnyMap struct and
+/// insert items that have 'static lifetimes. This is achieved by leaking allocations via
+/// `NonNull<T>` and never removing items. This module only exposes the StaticAnyMap struct and
 /// its get_or_init method. Using these should be perfectly safe.
 #[derive(Default)]
 pub struct StaticAnyMap {
@@ -26,6 +42,7 @@ pub struct StaticAnyMap {
 // `OnceLock<StaticAnyMap>` in a static context. This is safe because we never expose
 // `&mut AnyMap` outside the lock, and all inserted values are `Sync + 'static`.
 unsafe impl Sync for StaticAnyMap {}
+// SAFETY: See above.
 unsafe impl Send for StaticAnyMap {}
 
 impl StaticAnyMap {
@@ -34,26 +51,23 @@ impl StaticAnyMap {
         // Fast path: read lock only
         {
             let map = self.inner.read();
-            if let Some(val) = map.get::<Box<T>>() {
-                // SAFETY: Values are boxed and never removed from the map which has static
-                // lifetime, so the pointed-to data has static lifetime.
-                return unsafe { extend_lifetime(val) };
+            if let Some(leaked) = map.get::<Leaked<T>>() {
+                // SAFETY: The pointer was created from `Box::into_raw` and is never freed,
+                // so it is valid for 'static. We only hand out shared references and T: Sync.
+                return unsafe { leaked.0.as_ref() };
             }
         }
 
         // Slow path: write lock, use or_insert_with to guarantee init runs at most once
         let mut map = self.inner.write();
-        let val = map.entry().or_insert_with(|| Box::new(init()));
-        // SAFETY: Same as above.
-        unsafe { extend_lifetime(val) }
+        let leaked = map.entry().or_insert_with(|| {
+            // SAFETY: `Box::into_raw` returns a valid, aligned, non-null pointer.
+            let ptr = unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(init()))) };
+            Leaked(ptr)
+        });
+        // SAFETY: Same as fast path.
+        unsafe { leaked.0.as_ref() }
     }
-}
-
-// SAFETY: The data is boxed inside a map with static lifetime. We only insert and never remove,
-// so the pointed-to data lives for 'static. We return a shared reference, so aliasing rules are
-// upheld (mutation requires UnsafeCell in T).
-unsafe fn extend_lifetime<T>(boxed: &Box<T>) -> &'static T {
-    unsafe { std::mem::transmute::<&T, &'static T>(boxed.as_ref()) }
 }
 
 // Compile tests
