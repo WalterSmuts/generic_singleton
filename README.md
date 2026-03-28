@@ -12,7 +12,7 @@ error[E0401]: can't use generic parameters from outer function
 That's pretty frustrating when you want to write a singleton pattern that rely's on a generic
 parameter. This crate allows for this pattern with minimal runtime overhead.
 
-`generic_singleton` uses [anymap] behind the scenes to store a map of each
+`generic_singleton` uses [anymap3] behind the scenes to store a map of each
 generic type. The first time you hit the `get_or_init` macro we initialize the
 singleton. Subsequent calls to `get_or_init` will retrieve the singleton from
 the map.
@@ -51,12 +51,12 @@ fn main() {
 
 The example shown above has a drawback of requiring an `RwLock` to ensure
 synchronisation around the inner [AnyMap]. In single-threaded situations we can
-remove this lock and provide mutable references directly using the
+remove this lock and provide references directly using the
 `get_or_init_thread_local!` macro. This comes at the cost of ergonomics,
 requiring you to express your logic in a closure rather than simply returning a
 reference.
 
 [static generic items]: https://doc.rust-lang.org/reference/items/static-items.html#statics--generics
-[anymap]: https://docs.rs/anymap/latest/anymap/
-[AnyMap]: https://docs.rs/anymap/latest/anymap/type.AnyMap.html
+[anymap3]: https://docs.rs/anymap3/latest/anymap3/
+[AnyMap]: https://docs.rs/anymap3/latest/anymap3/type.AnyMap.html
 [new type pattern]: https://doc.rust-lang.org/rust-by-example/generics/new_types.html
