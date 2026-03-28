@@ -61,7 +61,9 @@ macro_rules! get_or_init {
         use $crate::static_anymap::StaticAnyMap;
 
         static STATIC_ANY_MAP: OnceLock<StaticAnyMap> = OnceLock::new();
-        STATIC_ANY_MAP.get_or_init(StaticAnyMap::default).get_or_init($init)
+        STATIC_ANY_MAP
+            .get_or_init(StaticAnyMap::default)
+            .get_or_init($init)
     }};
 }
 

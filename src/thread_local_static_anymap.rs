@@ -46,7 +46,8 @@ impl ThreadLocalStaticAnymap {
             let map = unsafe { &mut *self.inner.get() };
             let leaked = map.entry().or_insert_with(|| {
                 // SAFETY: `Box::into_raw` returns a valid, aligned, non-null pointer.
-                let ptr = unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(OnceCell::new()))) };
+                let ptr =
+                    unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(OnceCell::new()))) };
                 Leaked(ptr)
             });
             // SAFETY: The pointer was created from `Box::into_raw` and is never freed.
