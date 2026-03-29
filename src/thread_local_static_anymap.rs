@@ -1,25 +1,12 @@
 use anymap3::AnyMap;
 use std::cell::OnceCell;
 use std::cell::UnsafeCell;
-use std::ptr::NonNull;
-
-/// A wrapper around `NonNull<T>` that implements `Any` so it can be stored in an `AnyMap`.
-///
-/// We use `NonNull<T>` instead of `Box<T>` to avoid `Box`'s aliasing assertions.
-/// See `static_anymap::Leaked` for the full rationale.
-struct Leaked<T>(NonNull<T>);
-
-impl<T> Drop for Leaked<T> {
-    fn drop(&mut self) {
-        // SAFETY: The pointer was created from `Box::into_raw`.
-        unsafe { drop(Box::from_raw(self.0.as_ptr())) };
-    }
-}
 
 /// The point of this struct is to wrap the AnyMap in a thread local version that will only insert
-/// items that have 'static lifetimes. This is achieved by leaking allocations via `NonNull<T>`
-/// and never removing items. This module only exposes the ThreadLocalStaticAnymap struct and its
-/// get_or_init_with method. Using these should be perfectly safe.
+/// items that have 'static lifetimes. This is achieved by leaking allocations via `Box::leak`
+/// and storing the resulting `&'static OnceCell<T>` directly in the map. This module only exposes
+/// the ThreadLocalStaticAnymap struct and its get_or_init_with method. Using these should be
+/// perfectly safe.
 #[derive(Default)]
 pub struct ThreadLocalStaticAnymap {
     inner: UnsafeCell<AnyMap>,
@@ -35,24 +22,19 @@ impl ThreadLocalStaticAnymap {
     /// storage and that the `with` closure doesn't contain references to the same
     /// ThreadLocalStaticAnymap.
     pub fn get_or_init_with<T: 'static>(&self, init: impl FnOnce() -> T, with: impl FnOnce(&T)) {
-        let cell: &OnceCell<T> = {
+        let cell: &'static OnceCell<T> = {
             // SAFETY:
             // `ThreadLocalStaticAnymap` is `!Sync`, so this must be the only thread with a
             // reference to it. We never call `init` or `with` while holding a reference to
-            // `map` because its scope is limited to this block. The returned `NonNull` points
-            // to a heap allocation that is never freed, so it remains valid. Using `NonNull`
-            // instead of `Box` avoids aliasing issues: reentrant calls that create a new
-            // `&mut *self.inner.get()` do not invalidate pointers derived from `NonNull`.
+            // `map` because its scope is limited to this block. The stored `&'static OnceCell<T>`
+            // was created via `Box::leak` and lives forever, so reentrant calls that create a
+            // new `&mut *self.inner.get()` cannot invalidate it — the `&'static` reference
+            // points to a heap allocation independent of the map's storage.
             let map = unsafe { &mut *self.inner.get() };
-            let leaked = map.entry().or_insert_with(|| {
-                // SAFETY: `Box::into_raw` returns a valid, aligned, non-null pointer.
-                let ptr =
-                    unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(OnceCell::new()))) };
-                Leaked(ptr)
-            });
-            // SAFETY: The pointer was created from `Box::into_raw` and is never freed.
-            // No `&mut OnceCell<T>` is ever created from this pointer.
-            unsafe { leaked.0.as_ref() }
+            map.entry().or_insert_with(|| {
+                let leaked: &'static OnceCell<T> = Box::leak(Box::new(OnceCell::new()));
+                leaked
+            })
         };
 
         let t_ref = cell.get_or_init(init);
