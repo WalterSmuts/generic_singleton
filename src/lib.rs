@@ -114,6 +114,33 @@ macro_rules! get_or_init_thread_local {
     }};
 }
 
+// Compile tests
+
+// Note: compile_fail tests need to be in a public module that exists even when `cfg(not(test))`
+// otherwise the compiler won't execute them.
+
+/// ```compile_fail
+/// use generic_singleton::get_or_init;
+///
+/// fn check_static_dont_leak_unsafe() {
+///     unsafe fn not_safe() {}
+///
+///     get_or_init!(|| not_safe());
+/// }
+/// ```
+const _: () = ();
+
+/// ```compile_fail
+/// use generic_singleton::get_or_init_thread_local;
+///
+/// fn check_thread_local_dont_leak_unsafe() {
+///     unsafe fn not_safe() {}
+///
+///     get_or_init_thread_local!(|| not_safe());
+/// }
+/// ```
+const _: () = ();
+
 #[cfg(test)]
 mod tests {
 
@@ -201,30 +228,3 @@ mod tests {
         recursive(true)
     }
 }
-
-// Compile tests
-
-// Note: compile_fail tests need to be in a public module that exists even when `cfg(not(test))`
-// otherwise the compiler won't execute them.
-
-/// ```compile_fail
-/// use generic_singleton::get_or_init;
-///
-/// fn check_static_dont_leak_unsafe() {
-///     unsafe fn not_safe() {}
-///
-///     get_or_init!(|| not_safe());
-/// }
-/// ```
-const _: () = ();
-
-/// ```compile_fail
-/// use generic_singleton::get_or_init_thread_local;
-///
-/// fn check_thread_local_dont_leak_unsafe() {
-///     unsafe fn not_safe() {}
-///
-///     get_or_init_thread_local!(|| not_safe());
-/// }
-/// ```
-const _: () = ();
